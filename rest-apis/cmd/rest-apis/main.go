@@ -2,6 +2,10 @@ package main
 
 
 
+import (
+	"fmt"
+)
+
 func main() {
-	println("Hello, REST APIs!")
+	fmt.Println("Hello, REST APIs!")
 }
