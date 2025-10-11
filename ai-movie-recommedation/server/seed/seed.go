@@ -2,8 +2,10 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
+	"os"
 	"time"
 
 	"github.com/joho/godotenv"
@@ -14,13 +16,11 @@ import (
 )
 
 func main() {
-	// Load environment variables
-	err := godotenv.Load(".env")
+	err := godotenv.Load("../.env")
 	if err != nil {
 		log.Println("Warning: .env file not found")
 	}
 
-	// Connect to database
 	client := database.Connect()
 	defer func() {
 		if err := client.Disconnect(context.Background()); err != nil {
@@ -28,26 +28,31 @@ func main() {
 		}
 	}()
 
-	// Seed genres
-	if err := seedGenres(client); err != nil {
+	if err := seedGenresFromJSON(client); err != nil {
 		log.Fatalf("Failed to seed genres: %v", err)
 	}
 
-	// Seed rankings
-	if err := seedRankings(client); err != nil {
+	if err := seedRankingsFromJSON(client); err != nil {
 		log.Fatalf("Failed to seed rankings: %v", err)
+	}
+
+	if err := seedUsersFromJSON(client); err != nil {
+		log.Fatalf("Failed to seed users: %v", err)
+	}
+
+	if err := seedMoviesFromJSON(client); err != nil {
+		log.Fatalf("Failed to seed movies: %v", err)
 	}
 
 	fmt.Println("Database seeded successfully!")
 }
 
-func seedGenres(client *mongo.Client) error {
+func seedGenresFromJSON(client *mongo.Client) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	genreCollection := database.OpenCollection("genres", client)
 
-	// Check if genres already exist
 	count, err := genreCollection.CountDocuments(ctx, bson.D{})
 	if err != nil {
 		return err
@@ -58,37 +63,26 @@ func seedGenres(client *mongo.Client) error {
 		return nil
 	}
 
-	// Define genres
-	genres := []models.Genre{
-		{GenreID: 1, GenreName: "Action"},
-		{GenreID: 2, GenreName: "Adventure"},
-		{GenreID: 3, GenreName: "Animation"},
-		{GenreID: 4, GenreName: "Comedy"},
-		{GenreID: 5, GenreName: "Crime"},
-		{GenreID: 6, GenreName: "Documentary"},
-		{GenreID: 7, GenreName: "Drama"},
-		{GenreID: 8, GenreName: "Fantasy"},
-		{GenreID: 9, GenreName: "Horror"},
-		{GenreID: 10, GenreName: "Mystery"},
-		{GenreID: 11, GenreName: "Romance"},
-		{GenreID: 12, GenreName: "Sci-Fi"},
-		{GenreID: 13, GenreName: "Thriller"},
-		{GenreID: 14, GenreName: "Western"},
-		{GenreID: 15, GenreName: "Musical"},
-		{GenreID: 16, GenreName: "War"},
-		{GenreID: 17, GenreName: "Historical"},
-		{GenreID: 18, GenreName: "Biography"},
-		{GenreID: 19, GenreName: "Sport"},
-		{GenreID: 20, GenreName: "Family"},
+	data, err := os.ReadFile("../genres.json")
+	if err != nil {
+		return fmt.Errorf("failed to read genres.json: %v", err)
 	}
 
-	// Convert to interface slice
+	var genres []models.Genre
+	if err := json.Unmarshal(data, &genres); err != nil {
+		return fmt.Errorf("failed to parse genres.json: %v", err)
+	}
+
+	if len(genres) == 0 {
+		fmt.Println("No genres to insert")
+		return nil
+	}
+
 	var documents []interface{}
 	for _, genre := range genres {
 		documents = append(documents, genre)
 	}
 
-	// Insert genres
 	result, err := genreCollection.InsertMany(ctx, documents)
 	if err != nil {
 		return err
@@ -98,13 +92,12 @@ func seedGenres(client *mongo.Client) error {
 	return nil
 }
 
-func seedRankings(client *mongo.Client) error {
+func seedRankingsFromJSON(client *mongo.Client) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	rankingCollection := database.OpenCollection("rankings", client)
 
-	// Check if rankings already exist
 	count, err := rankingCollection.CountDocuments(ctx, bson.D{})
 	if err != nil {
 		return err
@@ -115,29 +108,121 @@ func seedRankings(client *mongo.Client) error {
 		return nil
 	}
 
-	// Define rankings
-	rankings := []models.Ranking{
-		{RankingValue: 1, RankingName: "Excellent"},
-		{RankingValue: 2, RankingName: "Very Good"},
-		{RankingValue: 3, RankingName: "Good"},
-		{RankingValue: 4, RankingName: "Average"},
-		{RankingValue: 5, RankingName: "Below Average"},
-		{RankingValue: 6, RankingName: "Poor"},
-		{RankingValue: 999, RankingName: "Not Rated"},
+	data, err := os.ReadFile("../rankings.json")
+	if err != nil {
+		return fmt.Errorf("failed to read rankings.json: %v", err)
 	}
 
-	// Convert to interface slice
+	var rankings []models.Ranking
+	if err := json.Unmarshal(data, &rankings); err != nil {
+		return fmt.Errorf("failed to parse rankings.json: %v", err)
+	}
+
+	if len(rankings) == 0 {
+		fmt.Println("No rankings to insert")
+		return nil
+	}
+
 	var documents []interface{}
 	for _, ranking := range rankings {
 		documents = append(documents, ranking)
 	}
 
-	// Insert rankings
 	result, err := rankingCollection.InsertMany(ctx, documents)
 	if err != nil {
 		return err
 	}
 
 	fmt.Printf("Inserted %d rankings\n", len(result.InsertedIDs))
+	return nil
+}
+
+func seedUsersFromJSON(client *mongo.Client) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	userCollection := database.OpenCollection("users", client)
+
+	count, err := userCollection.CountDocuments(ctx, bson.D{})
+	if err != nil {
+		return err
+	}
+
+	if count > 0 {
+		fmt.Printf("Users already exist (%d users). Skipping...\n", count)
+		return nil
+	}
+
+	data, err := os.ReadFile("./users.json")
+	if err != nil {
+		return fmt.Errorf("failed to read users.json: %v", err)
+	}
+
+	var users []models.User
+	if err := json.Unmarshal(data, &users); err != nil {
+		return fmt.Errorf("failed to parse users.json: %v", err)
+	}
+
+	if len(users) == 0 {
+		fmt.Println("No users to insert")
+		return nil
+	}
+
+	var documents []interface{}
+	for _, user := range users {
+		documents = append(documents, user)
+	}
+
+	result, err := userCollection.InsertMany(ctx, documents)
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("Inserted %d users\n", len(result.InsertedIDs))
+	return nil
+}
+
+func seedMoviesFromJSON(client *mongo.Client) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	movieCollection := database.OpenCollection("movies", client)
+
+	count, err := movieCollection.CountDocuments(ctx, bson.D{})
+	if err != nil {
+		return err
+	}
+
+	if count > 0 {
+		fmt.Printf("Movies already exist (%d movies). Skipping...\n", count)
+		return nil
+	}
+
+	data, err := os.ReadFile("./movies.json")
+	if err != nil {
+		return fmt.Errorf("failed to read movies.json: %v", err)
+	}
+
+	var movies []models.Movie
+	if err := json.Unmarshal(data, &movies); err != nil {
+		return fmt.Errorf("failed to parse movies.json: %v", err)
+	}
+
+	if len(movies) == 0 {
+		fmt.Println("No movies to insert")
+		return nil
+	}
+
+	var documents []interface{}
+	for _, movie := range movies {
+		documents = append(documents, movie)
+	}
+
+	result, err := movieCollection.InsertMany(ctx, documents)
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("Inserted %d movies\n", len(result.InsertedIDs))
 	return nil
 }

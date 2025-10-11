@@ -15,7 +15,7 @@ func Connect() *mongo.Client {
 	err := godotenv.Load(".env")
 
 	if err != nil {
-		log.Println("Warning: unable to fund .env file")
+		log.Println("Warning: unable to find .env file")
 	}
 
 	MongoDb := os.Getenv("MONGODB_URI")
