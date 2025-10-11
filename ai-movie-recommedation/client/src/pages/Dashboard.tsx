@@ -1,66 +1,66 @@
-import { Link } from "react-router-dom";
-import { Play, Plus, Tv, TrendingUp, Clock } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { Play, Plus, Tv, TrendingUp, Clock, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
-
-const MOCK_ANIME = [
-  {
-    id: 1,
-    title: "Attack on Titan",
-    year: 2013,
-    rating: 4.9,
-    episodes: 87,
-    poster: "https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?w=300&h=450&fit=crop",
-    genre: "Shounen",
-    studio: "MAPPA",
-    status: "Completed",
-  },
-  {
-    id: 2,
-    title: "Demon Slayer",
-    year: 2019,
-    rating: 4.8,
-    episodes: 44,
-    poster: "https://images.unsplash.com/photo-1578632292335-df3abbb0d586?w=300&h=450&fit=crop",
-    genre: "Shounen",
-    studio: "ufotable",
-    status: "Ongoing",
-  },
-  {
-    id: 3,
-    title: "Steins;Gate",
-    year: 2011,
-    rating: 4.9,
-    episodes: 24,
-    poster: "https://images.unsplash.com/photo-1618172193622-ae2d025f4032?w=300&h=450&fit=crop",
-    genre: "Sci-Fi",
-    studio: "White Fox",
-    status: "Completed",
-  },
-  {
-    id: 4,
-    title: "Your Name",
-    year: 2016,
-    rating: 4.8,
-    episodes: 1,
-    poster: "https://images.unsplash.com/photo-1613376023733-0a73315d9b06?w=300&h=450&fit=crop",
-    genre: "Romance",
-    studio: "CoMix Wave",
-    status: "Completed",
-  },
-  {
-    id: 5,
-    title: "One Punch Man",
-    year: 2015,
-    rating: 4.7,
-    episodes: 24,
-    poster: "https://images.unsplash.com/photo-1612036782180-6f0b6cd846fe?w=300&h=450&fit=crop",
-    genre: "Shounen",
-    studio: "Madhouse",
-    status: "Ongoing",
-  },
-];
+import { useAuth } from "@/contexts/AuthContext";
+import { useToast } from "@/hooks/use-toast";
+import { api, Movie } from "@/lib/api";
 
 const Dashboard = () => {
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+  const { toast } = useToast();
+
+  const [recommendedMovies, setRecommendedMovies] = useState<Movie[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchRecommendedMovies = async () => {
+      if (!user) {
+        console.log("User not authenticated, skipping recommended movies fetch");
+        setIsLoading(false);
+        return;
+      }
+
+      try {
+        console.log("Fetching recommended movies for user:", user.user_id);
+        const movies = await api.movies.getRecommendedMovies();
+        console.log("Recommended movies response:", movies);
+        setRecommendedMovies(movies || []);
+      } catch (error) {
+        console.error("Failed to fetch recommended movies:", error);
+        const errorMessage = error instanceof Error ? error.message : "Failed to load recommended movies";
+        console.error("Error details:", errorMessage);
+        toast({
+          title: "Error",
+          description: errorMessage,
+          variant: "destructive",
+        });
+        setRecommendedMovies([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchRecommendedMovies();
+  }, [user, toast]);
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+      navigate("/login");
+      toast({
+        title: "Logged out",
+        description: "You have been logged out successfully.",
+      });
+    } catch (error) {
+      console.error("Logout error:", error);
+    }
+  };
+
+  const getInitials = (firstName: string, lastName: string) => {
+    return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
+  };
   return (
     <div className="min-h-screen sakura-bg">
       {/* Navigation */}
@@ -87,8 +87,17 @@ const Dashboard = () => {
               </div>
             </div>
             <div className="flex items-center gap-4">
+              <Button
+                variant="ghost"
+                size="sm"
+                leftIcon={<LogOut size={18} />}
+                onClick={handleLogout}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                Logout
+              </Button>
               <div className="w-10 h-10 bg-gradient-primary rounded-full flex items-center justify-center text-primary-foreground font-bold shadow-glow-primary cursor-pointer hover:scale-110 transition-transform">
-                JD
+                {user ? getInitials(user.first_name, user.last_name) : "U"}
               </div>
             </div>
           </div>
@@ -122,7 +131,7 @@ const Dashboard = () => {
               Jujutsu Kaisen
             </h1>
             <p className="text-lg text-muted-foreground mb-6 leading-relaxed">
-              A boy swallows a cursed talisman and becomes possessed. He must learn sorcery to protect 
+              A boy swallows a cursed talisman and becomes possessed. He must learn sorcery to protect
               those he loves and exorcise the demons within himself in this dark supernatural action series.
             </p>
             <div className="flex items-center gap-6 mb-8 flex-wrap">
@@ -157,65 +166,69 @@ const Dashboard = () => {
           <h2 className="text-3xl font-bold mb-2 flex items-center gap-3">
             <span className="text-gradient-neon">Recommended For You</span>
           </h2>
-          <p className="text-muted-foreground flex items-center gap-2">
-            Based on your favorite genres: <span className="text-primary font-medium">Shounen</span>, 
-            <span className="text-secondary font-medium">Sci-Fi</span>, 
-            <span className="text-accent font-medium">Romance</span>
-          </p>
+          {user && user.favourite_genres.length > 0 && (
+            <p className="text-muted-foreground flex items-center gap-2">
+              Based on your favorite genres: {user.favourite_genres.map((genre, index) => (
+                <span key={genre.genre_id}>
+                  {index > 0 && ", "}
+                  <span className="text-primary font-medium">{genre.genre_name}</span>
+                </span>
+              ))}
+            </p>
+          )}
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
-          {MOCK_ANIME.map((anime) => (
-            <div
-              key={anime.id}
-              className="group cursor-pointer animate-fade-in"
-            >
-              <div className="relative aspect-[2/3] rounded-xl overflow-hidden mb-3 bg-background-secondary border-2 border-transparent hover:border-primary/50 transition-all">
-                <img
-                  src={anime.poster}
-                  alt={anime.title}
-                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                  <Button variant="hero" size="sm" leftIcon={<Play size={16} />} className="shadow-glow-primary">
-                    Watch
-                  </Button>
-                  <Button variant="secondary" size="sm" leftIcon={<Plus size={16} />}>
-                    My List
-                  </Button>
+        {isLoading ? (
+          <div className="flex justify-center py-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+          </div>
+        ) : recommendedMovies.length > 0 ? (
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
+            {recommendedMovies.map((movie) => (
+              <div
+                key={movie.imdb_id}
+                className="group cursor-pointer animate-fade-in"
+              >
+                <div className="relative aspect-[2/3] rounded-xl overflow-hidden mb-3 bg-background-secondary border-2 border-transparent hover:border-primary/50 transition-all">
+                  <img
+                    src={movie.poster_path}
+                    alt={movie.title}
+                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                    <Button variant="hero" size="sm" leftIcon={<Play size={16} />} className="shadow-glow-primary">
+                      Watch
+                    </Button>
+                    <Button variant="secondary" size="sm" leftIcon={<Plus size={16} />}>
+                      My List
+                    </Button>
+                  </div>
+                  {/* Ranking Badge */}
+                  <div className="absolute top-3 right-3 bg-background/90 backdrop-blur-sm px-2 py-1 rounded-lg flex items-center gap-1 border border-primary/30">
+                    <span className="text-primary text-sm font-bold">{movie.ranking.ranking_name}</span>
+                  </div>
+                  {/* Genre Badge */}
+                  {movie.genre.length > 0 && (
+                    <div className="absolute top-3 left-3 px-2 py-1 rounded-lg text-xs font-bold bg-success/20 text-success border border-success/50">
+                      {movie.genre[0].genre_name}
+                    </div>
+                  )}
                 </div>
-                {/* Rating Badge */}
-                <div className="absolute top-3 right-3 bg-background/90 backdrop-blur-sm px-2 py-1 rounded-lg flex items-center gap-1 border border-primary/30">
-                  <span className="text-primary text-sm font-bold">{anime.rating}</span>
-                  <span className="text-primary text-xs">★</span>
-                </div>
-                {/* Status Badge */}
-                <div className={`absolute top-3 left-3 px-2 py-1 rounded-lg text-xs font-bold ${
-                  anime.status === 'Ongoing' 
-                    ? 'bg-success/20 text-success border border-success/50' 
-                    : 'bg-muted/20 text-muted-foreground border border-muted/50'
-                }`}>
-                  {anime.status}
-                </div>
-                {/* Episode Count */}
-                <div className="absolute bottom-3 left-3 bg-background/90 backdrop-blur-sm px-2 py-1 rounded-lg flex items-center gap-1 border border-accent/30">
-                  <Clock size={12} className="text-accent" />
-                  <span className="text-xs font-medium">{anime.episodes} EP</span>
-                </div>
+                <h3 className="font-bold mb-1 group-hover:text-primary transition-colors line-clamp-2">
+                  {movie.title}
+                </h3>
+                <p className="text-sm text-muted-foreground line-clamp-1">
+                  {movie.genre.map(g => g.genre_name).join(", ")}
+                </p>
               </div>
-              <h3 className="font-bold mb-1 group-hover:text-primary transition-colors line-clamp-1">
-                {anime.title}
-              </h3>
-              <p className="text-sm text-muted-foreground">
-                {anime.year} • {anime.genre}
-              </p>
-              <p className="text-xs text-muted-foreground/70">
-                Studio: {anime.studio}
-              </p>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-12">
+            <p className="text-muted-foreground text-lg">No recommendations available yet.</p>
+          </div>
+        )}
       </section>
 
       {/* Continue Watching */}

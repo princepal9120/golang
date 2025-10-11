@@ -1,20 +1,46 @@
-import { useState } from "react";
-import { Link } from "react-router-dom";
-import { Play, Trash2, Heart, Tv, Clock, TrendingUp } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { Play, Trash2, Heart, Tv, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
-
-const MOCK_WATCHLIST = [
-  { id: 1, title: "Attack on Titan", year: 2013, rating: 4.9, poster: "https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?w=300&h=450&fit=crop", genre: "Shounen", episodes: 87, studio: "MAPPA", status: "Completed", addedDate: "2025-01-10" },
-  { id: 2, title: "Demon Slayer", year: 2019, rating: 4.8, poster: "https://images.unsplash.com/photo-1578632292335-df3abbb0d586?w=300&h=450&fit=crop", genre: "Shounen", episodes: 44, studio: "ufotable", status: "Ongoing", addedDate: "2025-01-09" },
-  { id: 3, title: "Steins;Gate", year: 2011, rating: 4.9, poster: "https://images.unsplash.com/photo-1618172193622-ae2d025f4032?w=300&h=450&fit=crop", genre: "Sci-Fi", episodes: 24, studio: "White Fox", status: "Completed", addedDate: "2025-01-08" },
-  { id: 5, title: "One Punch Man", year: 2015, rating: 4.7, poster: "https://images.unsplash.com/photo-1612036782180-6f0b6cd846fe?w=300&h=450&fit=crop", genre: "Shounen", episodes: 24, studio: "Madhouse", status: "Ongoing", addedDate: "2025-01-05" },
-];
+import { useAuth } from "@/contexts/AuthContext";
+import { useToast } from "@/hooks/use-toast";
+import { Movie } from "@/lib/api";
 
 const MyList = () => {
-  const [watchlist, setWatchlist] = useState(MOCK_WATCHLIST);
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  const [watchlist, setWatchlist] = useState<Movie[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const removeFromList = (animeId: number) => {
-    setWatchlist(watchlist.filter((anime) => anime.id !== animeId));
+  useEffect(() => {
+    // TODO: Fetch user's watchlist from API when endpoint is available
+    setIsLoading(false);
+  }, []);
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+      navigate("/login");
+      toast({
+        title: "Logged out",
+        description: "You have been logged out successfully.",
+      });
+    } catch (error) {
+      console.error("Logout error:", error);
+    }
+  };
+
+  const getInitials = (firstName: string, lastName: string) => {
+    return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
+  };
+
+  const removeFromList = (movieId: string) => {
+    setWatchlist(watchlist.filter((movie) => movie.imdb_id !== movieId));
+    toast({
+      title: "Removed from list",
+      description: "Movie has been removed from your list",
+    });
   };
 
   return (
@@ -43,8 +69,17 @@ const MyList = () => {
               </div>
             </div>
             <div className="flex items-center gap-4">
+              <Button
+                variant="ghost"
+                size="sm"
+                leftIcon={<LogOut size={18} />}
+                onClick={handleLogout}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                Logout
+              </Button>
               <div className="w-10 h-10 bg-gradient-primary rounded-full flex items-center justify-center text-primary-foreground font-bold shadow-glow-primary cursor-pointer hover:scale-110 transition-transform">
-                JD
+                {user ? getInitials(user.first_name, user.last_name) : "U"}
               </div>
             </div>
           </div>
@@ -68,87 +103,61 @@ const MyList = () => {
         </div>
 
         {/* Watchlist */}
-        {watchlist.length > 0 ? (
-          <div className="space-y-6">
-            {watchlist.map((anime, index) => (
+        {isLoading ? (
+          <div className="flex justify-center py-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+          </div>
+        ) : watchlist.length > 0 ? (
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
+            {watchlist.map((movie, index) => (
               <div
-                key={anime.id}
-                className="group bg-card border-2 border-border hover:border-primary/50 rounded-2xl overflow-hidden transition-all duration-300 hover:shadow-glow-primary animate-fade-in anime-border"
-                style={{ animationDelay: `${index * 100}ms` }}
+                key={movie.imdb_id}
+                className="group cursor-pointer animate-fade-in"
+                style={{ animationDelay: `${index * 50}ms` }}
               >
-                <div className="flex flex-col md:flex-row">
-                  {/* Poster */}
-                  <div className="relative md:w-48 aspect-[2/3] md:aspect-auto bg-background-secondary flex-shrink-0">
-                    <img
-                      src={anime.poster}
-                      alt={anime.title}
-                      className="w-full h-full object-cover"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-300" />
-                    {/* Status Badge */}
-                    <div className={`absolute top-3 left-3 px-3 py-1 rounded-lg text-xs font-bold ${
-                      anime.status === 'Ongoing' 
-                        ? 'bg-success/80 text-success-foreground border border-success' 
-                        : 'bg-muted/80 text-foreground border border-muted'
-                    }`}>
-                      {anime.status}
-                    </div>
+                <div className="relative aspect-[2/3] rounded-xl overflow-hidden mb-3 bg-background-secondary border-2 border-transparent hover:border-primary/50 transition-all">
+                  <img
+                    src={movie.poster_path}
+                    alt={movie.title}
+                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                    <Button
+                      variant="hero"
+                      size="sm"
+                      leftIcon={<Play size={16} />}
+                      className="shadow-glow-primary"
+                      onClick={() => window.open(`https://www.youtube.com/watch?v=${movie.youtube_id}`, '_blank')}
+                    >
+                      Watch
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      leftIcon={<Trash2 size={16} />}
+                      onClick={() => removeFromList(movie.imdb_id)}
+                    >
+                      Remove
+                    </Button>
                   </div>
-
-                  {/* Content */}
-                  <div className="flex-1 p-6 flex flex-col justify-between">
-                    <div>
-                      <div className="flex items-start justify-between mb-3">
-                        <div>
-                          <h2 className="text-3xl font-bold mb-2 group-hover:text-gradient-neon transition-all">
-                            {anime.title}
-                          </h2>
-                          <div className="flex items-center gap-4 text-muted-foreground mb-3 flex-wrap">
-                            <span className="flex items-center gap-1">
-                              <TrendingUp size={16} className="text-primary" />
-                              {anime.year}
-                            </span>
-                            <span>•</span>
-                            <span className="flex items-center gap-1">
-                              <Clock size={16} className="text-accent" />
-                              {anime.episodes} Episodes
-                            </span>
-                            <span>•</span>
-                            <span className="px-3 py-1 bg-primary/10 text-primary rounded-lg text-sm font-bold border border-primary/30">
-                              {anime.genre}
-                            </span>
-                          </div>
-                          <p className="text-sm text-muted-foreground mb-2">
-                            Studio: <span className="text-foreground font-medium">{anime.studio}</span>
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-2 bg-gradient-primary px-4 py-2 rounded-xl shadow-glow-primary">
-                          <span className="text-primary-foreground text-xl font-bold">{anime.rating}</span>
-                          <span className="text-primary-foreground text-lg">★</span>
-                        </div>
-                      </div>
-                      <p className="text-sm text-muted-foreground mb-4 flex items-center gap-2">
-                        <Heart size={14} className="text-secondary" />
-                        Added on {new Date(anime.addedDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
-                      </p>
-                    </div>
-
-                    {/* Actions */}
-                    <div className="flex gap-3">
-                      <Button variant="hero" leftIcon={<Play size={18} />} className="shadow-glow-primary">
-                        Watch Now
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        leftIcon={<Trash2 size={18} />}
-                        onClick={() => removeFromList(anime.id)}
-                        className="hover:bg-destructive/10 hover:text-destructive"
-                      >
-                        Remove
-                      </Button>
-                    </div>
+                  {/* Ranking Badge */}
+                  <div className="absolute top-3 right-3 bg-background/90 backdrop-blur-sm px-2 py-1 rounded-lg flex items-center gap-1 border border-primary/30">
+                    <span className="text-primary text-sm font-bold">{movie.ranking.ranking_name}</span>
                   </div>
+                  {/* Genre Badge */}
+                  {movie.genre.length > 0 && (
+                    <div className="absolute top-3 left-3 px-2 py-1 rounded-lg text-xs font-bold bg-success/20 text-success border border-success/50">
+                      {movie.genre[0].genre_name}
+                    </div>
+                  )}
                 </div>
+                <h3 className="font-bold mb-1 group-hover:text-primary transition-colors line-clamp-2">
+                  {movie.title}
+                </h3>
+                <p className="text-sm text-muted-foreground line-clamp-1">
+                  {movie.genre.map(g => g.genre_name).join(", ")}
+                </p>
               </div>
             ))}
           </div>
@@ -173,30 +182,21 @@ const MyList = () => {
 
         {/* Quick Stats */}
         {watchlist.length > 0 && (
-          <div className="mt-12 grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="mt-12 grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="bg-card border-2 border-primary/30 rounded-2xl p-6 hover:shadow-glow-primary transition-all anime-border">
               <h3 className="text-muted-foreground text-sm font-medium mb-2 flex items-center gap-2">
                 <Tv size={16} className="text-primary" />
-                Total Anime
+                Total Movies
               </h3>
               <p className="text-5xl font-bold text-gradient-neon">{watchlist.length}</p>
             </div>
-            <div className="bg-card border-2 border-accent/30 rounded-2xl p-6 hover:shadow-glow-accent transition-all anime-border">
-              <h3 className="text-muted-foreground text-sm font-medium mb-2 flex items-center gap-2">
-                <Clock size={16} className="text-accent" />
-                Total Episodes
-              </h3>
-              <p className="text-5xl font-bold text-accent">
-                {watchlist.reduce((acc, anime) => acc + anime.episodes, 0)}
-              </p>
-            </div>
             <div className="bg-card border-2 border-secondary/30 rounded-2xl p-6 hover:shadow-glow-secondary transition-all anime-border">
               <h3 className="text-muted-foreground text-sm font-medium mb-2 flex items-center gap-2">
-                <TrendingUp size={16} className="text-secondary" />
-                Average Rating
+                <Heart size={16} className="text-secondary" />
+                Favorite Genres
               </h3>
-              <p className="text-5xl font-bold text-secondary">
-                {(watchlist.reduce((acc, anime) => acc + anime.rating, 0) / watchlist.length).toFixed(1)} ★
+              <p className="text-2xl font-bold text-secondary">
+                {user?.favourite_genres.map(g => g.genre_name).join(", ") || "None"}
               </p>
             </div>
           </div>

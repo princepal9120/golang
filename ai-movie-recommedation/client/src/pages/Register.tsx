@@ -1,31 +1,58 @@
-import { useState } from "react";
-import { Link } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useAuth } from "@/contexts/AuthContext";
+import { useToast } from "@/hooks/use-toast";
+import { api, Genre } from "@/lib/api";
 import { User, Mail, Lock } from "lucide-react";
 
-const GENRES = [
-  "Action", "Adventure", "Animation", "Comedy", "Crime", "Documentary",
-  "Drama", "Fantasy", "Horror", "Mystery", "Romance", "Sci-Fi", "Thriller"
-];
-
 const Register = () => {
+  const navigate = useNavigate();
+  const { register, isAuthenticated, isLoading: authLoading } = useAuth();
+  const { toast } = useToast();
+
+  // Redirect if already logged in
+  useEffect(() => {
+    if (!authLoading && isAuthenticated) {
+      navigate("/dashboard", { replace: true });
+    }
+  }, [isAuthenticated, authLoading, navigate]);
+
+  const [genres, setGenres] = useState<Genre[]>([]);
   const [formData, setFormData] = useState({
     first_name: "",
     last_name: "",
     email: "",
     password: "",
     confirm_password: "",
-    favourite_genres: [] as string[],
+    favourite_genres: [] as Genre[],
   });
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const toggleGenre = (genre: string) => {
+  // Fetch genres on component mount
+  useEffect(() => {
+    const fetchGenres = async () => {
+      try {
+        const fetchedGenres = await api.genres.getGenres();
+        setGenres(fetchedGenres);
+      } catch (error) {
+        toast({
+          title: "Error",
+          description: "Failed to load genres",
+          variant: "destructive",
+        });
+      }
+    };
+    fetchGenres();
+  }, []);
+
+  const toggleGenre = (genre: Genre) => {
     setFormData((prev) => ({
       ...prev,
-      favourite_genres: prev.favourite_genres.includes(genre)
-        ? prev.favourite_genres.filter((g) => g !== genre)
+      favourite_genres: prev.favourite_genres.some(g => g.genre_id === genre.genre_id)
+        ? prev.favourite_genres.filter((g) => g.genre_id !== genre.genre_id)
         : [...prev.favourite_genres, genre],
     }));
   };
@@ -46,6 +73,7 @@ const Register = () => {
     const newErrors: Record<string, string> = {};
     if (formData.first_name.length < 2) newErrors.first_name = "First name is too short";
     if (formData.last_name.length < 2) newErrors.last_name = "Last name is too short";
+    if (formData.password.length < 6) newErrors.password = "Password must be at least 6 characters";
     if (formData.password !== formData.confirm_password) {
       newErrors.confirm_password = "Passwords don't match";
     }
@@ -59,9 +87,30 @@ const Register = () => {
     }
 
     setIsLoading(true);
-    // TODO: Implement registration logic
-    console.log("Register:", formData);
-    setTimeout(() => setIsLoading(false), 1000);
+
+    try {
+      const { confirm_password, ...registrationData } = formData;
+      await register({
+        ...registrationData,
+        role: "USER", // Default role
+      });
+
+      toast({
+        title: "Success!",
+        description: "Your account has been created successfully.",
+      });
+
+      // Redirect to login page after successful registration
+      navigate("/login");
+    } catch (error) {
+      toast({
+        title: "Registration Failed",
+        description: error instanceof Error ? error.message : "Failed to create account",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -154,18 +203,17 @@ const Register = () => {
                 Favorite Genres <span className="text-muted-foreground">(Select at least one)</span>
               </label>
               <div className="flex flex-wrap gap-2">
-                {GENRES.map((genre) => (
+                {genres.map((genre) => (
                   <button
-                    key={genre}
+                    key={genre.genre_id}
                     type="button"
                     onClick={() => toggleGenre(genre)}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
-                      formData.favourite_genres.includes(genre)
-                        ? "bg-primary text-primary-foreground shadow-glow"
-                        : "bg-background-secondary text-muted-foreground hover:bg-background-elevated hover:text-foreground"
-                    }`}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${formData.favourite_genres.some(g => g.genre_id === genre.genre_id)
+                      ? "bg-primary text-primary-foreground shadow-glow"
+                      : "bg-background-secondary text-muted-foreground hover:bg-background-elevated hover:text-foreground"
+                      }`}
                   >
-                    {genre}
+                    {genre.genre_name}
                   </button>
                 ))}
               </div>

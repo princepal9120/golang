@@ -1,10 +1,24 @@
-import { useState } from "react";
-import { Link } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useAuth } from "@/contexts/AuthContext";
+import { useToast } from "@/hooks/use-toast";
 import { Mail, Lock } from "lucide-react";
 
 const Login = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { login, isAuthenticated, isLoading: authLoading } = useAuth();
+  const { toast } = useToast();
+
+  // Redirect if already logged in
+  useEffect(() => {
+    if (!authLoading && isAuthenticated) {
+      navigate("/dashboard", { replace: true });
+    }
+  }, [isAuthenticated, authLoading, navigate]);
+
   const [formData, setFormData] = useState({
     email: "",
     password: "",
@@ -14,9 +28,26 @@ const Login = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    // TODO: Implement login logic
-    console.log("Login:", formData);
-    setTimeout(() => setIsLoading(false), 1000);
+
+    try {
+      await login(formData.email, formData.password);
+      toast({
+        title: "Success!",
+        description: "You have been logged in successfully.",
+      });
+
+      // Redirect to the page they tried to visit or dashboard
+      const from = location.state?.from?.pathname || "/dashboard";
+      navigate(from, { replace: true });
+    } catch (error) {
+      toast({
+        title: "Login Failed",
+        description: error instanceof Error ? error.message : "Invalid email or password",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (

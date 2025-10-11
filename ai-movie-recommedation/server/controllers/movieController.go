@@ -35,6 +35,7 @@ func GetMovies(client *mongo.Client) gin.HandlerFunc {
 
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch movies."})
+			return
 		}
 		defer cursor.Close(ctx)
 
@@ -43,6 +44,11 @@ func GetMovies(client *mongo.Client) gin.HandlerFunc {
 		if err = cursor.All(ctx, &movies); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to decode movies."})
 			return
+		}
+
+		// Ensure we return an empty array instead of null
+		if movies == nil {
+			movies = []models.Movie{}
 		}
 
 		c.JSON(http.StatusOK, movies)
@@ -264,6 +270,7 @@ func GetRecommendedMovies(client *mongo.Client) gin.HandlerFunc {
 
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "User Id not found in context"})
+			return
 		}
 
 		favourite_genres, err := GetUsersFavouriteGenres(userId, client, c)
@@ -272,6 +279,9 @@ func GetRecommendedMovies(client *mongo.Client) gin.HandlerFunc {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
+
+		log.Printf("User ID: %s, Favourite Genres: %v", userId, favourite_genres)
+
 		err = godotenv.Load(".env")
 		if err != nil {
 			log.Println("Warning: .env file not found")
@@ -315,6 +325,14 @@ func GetRecommendedMovies(client *mongo.Client) gin.HandlerFunc {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
+
+		log.Printf("Found %d recommended movies for user %s", len(recommendedMovies), userId)
+
+		// Ensure we return an empty array instead of null
+		if recommendedMovies == nil {
+			recommendedMovies = []models.Movie{}
+		}
+
 		c.JSON(http.StatusOK, recommendedMovies)
 	}
 }
@@ -341,6 +359,7 @@ func GetUsersFavouriteGenres(userId string, client *mongo.Client, c *gin.Context
 		if err == mongo.ErrNoDocuments {
 			return []string{}, nil
 		}
+		return []string{}, err
 	}
 
 	favGenresArray, ok := result["favourite_genres"].(bson.A)
@@ -386,6 +405,12 @@ func GetGenres(client *mongo.Client) gin.HandlerFunc {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
+
+		// Ensure we return an empty array instead of null
+		if genres == nil {
+			genres = []models.Genre{}
+		}
+
 		c.JSON(http.StatusOK, genres)
 
 	}
