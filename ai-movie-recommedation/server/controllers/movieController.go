@@ -2,8 +2,10 @@ package controllers
 
 import (
 	"context"
+	"errors"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -13,6 +15,7 @@ import (
 	"github.com/princepal9120/ai-movie-recommedation/server/database"
 	"github.com/princepal9120/ai-movie-recommedation/server/models"
 	"github.com/princepal9120/ai-movie-recommedation/server/utils"
+	"github.com/tmc/langchaingo/llms/openai"
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
 )
@@ -118,7 +121,36 @@ func AdminReviewUpdate() gin.HandlerFunc {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
 			return
 		}
+		setiment, rankVal, err :=GetReviewRanking(req.AdminReview)
+		if err!= nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Error getting review error"})
+			return
+		}
+		filter := bson.M{"imdb_id", movieId}
+		update :=bson.M {
+			"$set": bson.M{
+				"admin_review": req.AdminReview,
+				"ranking": bson.M{
+					"ranking_value": rankVal,
+					"ranking_name": setiment,
+				},
+			},
+		}
+		var ctx, cancel =context.WithTimeout(context.Background(), 100*time.Second)
+		defer cancel()
 
+		result, err := movieCollection.UpdateOne(ctx,filter,update)
+		if err!= nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Error when updating moviex"})
+			return
+		}
+		if result.MatchedCount ==0 {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Movie not found"})
+			return
+		}
+		resp.RankingName=setiment
+		resp.AdminReview= req.AdminReview
+		c.JSON(http.StatusOK,resp)
 	}
 
 }
@@ -136,11 +168,36 @@ func GetReviewRanking(admin_review string) (string, int, error) {
 		}
 
 	}
-	sentimentDelimited = strings.Trim(sentimentDelimited,",")
+	sentimentDelimited = strings.Trim(sentimentDelimited, ",")
 	err = godotenv.Load(".env")
-	if err!= nil {
+	if err != nil {
 		log.Println("Warning: .env file not found")
 	}
+	OpenAiApiKey := os.Getenv("OPENAI_API_KEY")
+	if OpenAiApiKey == "" {
+		return "", 0, errors.New("could not read openai key")
+	}
+	llm, err := openai.New(openai.WithToken(OpenAiApiKey))
+	if err != nil {
+		return "", 0, err
+	}
+	base_prompt_template := os.Getenv("BASE_PROMPT_TEMPLATE")
+
+	base_prompt := strings.Replace(base_prompt_template, "{rankings}", sentimentDelimited, 1)
+	response, err := llm.Call(context.Background(), base_prompt+admin_review)
+
+	if err != nil {
+		return "", 0, err
+	}
+	rankVal := 0
+	for _, ranking := range rankings {
+		if ranking.RankingName == response {
+			rankVal = ranking.RankingValue
+			break
+		}
+
+	}
+	return response, rankVal, nil
 
 }
 

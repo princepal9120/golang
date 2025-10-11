@@ -132,6 +132,10 @@ func LogoutHandler() gin.HandlerFunc {
 		// Clear tokens in the database
 		// Optionally, you can also remove the user session from the database if needed
 
-
+        if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Error logging out"})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"message": "Logged out successfully"})
 	}
 }
