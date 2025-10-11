@@ -3,6 +3,7 @@ package controllers
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -128,7 +129,7 @@ func AdminReviewUpdate() gin.HandlerFunc {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Error getting review error"})
 			return
 		}
-		filter := bson.M{"imdb_id", movieId}
+		filter := bson.D{{Key: "imdb_id", Value: movieId}}
 		update := bson.M{
 			"$set": bson.M{
 				"admin_review": req.AdminReview,
@@ -261,7 +262,7 @@ func GetRecommendedMovies() gin.HandlerFunc {
 		var ctx, cancel = context.WithTimeout(c, 100*time.Second)
 		defer cancel()
 
-		var movieCollection *mongo.Collection = database.OpenCollection("movies", client)
+		var movieCollection *mongo.Collection = database.OpenCollection("movies")
 
 		cursor, err := movieCollection.Find(ctx, filter, findOptions)
 
@@ -298,9 +299,12 @@ func GetUsersFavouriteGenres(userId string) ([]string, error) {
 		}
 	}
 	favGenresArray, ok := result["favourite_genres"].(bson.A)
+
+		fmt.Println("fav", ok)
 	if !ok {
 		return []string{}, errors.New("Unable to retrieve fav generes")
 	}
+
 	var genreNames []string
 	for _, item := range favGenresArray {
 		if genereMap, ok := item.(bson.D); ok {
