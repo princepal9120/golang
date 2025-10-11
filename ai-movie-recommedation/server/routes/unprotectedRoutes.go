@@ -13,5 +13,6 @@ func SetupUnProtectedRoutes(router *gin.Engine) {
 	router.POST("/login", controllers.LoginUser())
 	router.POST("/logout", controllers.LogoutHandler())
 	// router.POST("/refresh", controllers.RefreshTokenHandler())
+	router.GET("/genres", controllers.GetGenres())
 
 }

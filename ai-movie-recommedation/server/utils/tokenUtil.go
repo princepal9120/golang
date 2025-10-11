@@ -118,12 +118,13 @@ func ValidateToken(tokenString string) (*SignedDetails, error) {
 
 }
 
-func GetRoleFromContext(c *gin.Context) (string, error) {
+func GetUserIdFromContext(c *gin.Context) (string, error) {
 	userId, exists := c.Get("userId")
 
 	if !exists {
 		return "", errors.New("userId does not exists in this context")
 	}
+
 	id, ok := userId.(string)
 
 	if !ok {
@@ -132,4 +133,43 @@ func GetRoleFromContext(c *gin.Context) (string, error) {
 
 	return id, nil
 
+}
+
+func GetRoleFromContext(c *gin.Context) (string, error) {
+	role, exists := c.Get("role")
+
+	if !exists {
+		return "", errors.New("role does not exists in this context")
+	}
+
+	memberRole, ok := role.(string)
+
+	if !ok {
+		return "", errors.New("unable to retrieve userId")
+	}
+
+	return memberRole, nil
+
+}
+
+func ValidateRefreshToken(tokenString string) (*SignedDetails, error) {
+	claims := &SignedDetails{}
+	token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
+
+		return []byte(SECRET_REF_KEY), nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+		return nil, err
+	}
+
+	if claims.ExpiresAt.Time.Before(time.Now()) {
+		return nil, errors.New("refresh token has expired")
+	}
+
+	return claims, nil
 }
