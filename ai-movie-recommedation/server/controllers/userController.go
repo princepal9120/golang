@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -115,38 +116,22 @@ func LoginUser() gin.HandlerFunc {
 	}
 }
 
-func GetUsers() gin.HandlerFunc {
+func LogoutHandler() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		c.JSON(200, gin.H{"message": "List of users"})
-	}
-}
+		// clear the access token
+		var UserLogout struct {
+			UserId string `json:"user_id"`
+		}
+		err:= c.ShouldBind(&UserLogout)
+		if err != nil {
+			c.JSON(http.StatusBadRequest,gin.H{"error": "Invalid request payload"})
+			return
+		}
+		fmt.Println("User ID from Logout request:", UserLogout.UserId)
+		err =utils.UpdateAllTokens(UserLogout.UserId,"", "")
+		// Clear tokens in the database
+		// Optionally, you can also remove the user session from the database if needed
 
-func GetUser() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		userID := c.Param("id")
-		c.JSON(200, gin.H{
-			"message": "User details",
-			"userID":  userID,
-		})
-	}
-}
 
-func UpdateUser() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		userID := c.Param("id")
-		c.JSON(200, gin.H{
-			"message": "User updated successfully",
-			"userID":  userID,
-		})
-	}
-}
-
-func DeleteUser() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		userID := c.Param("id")
-		c.JSON(200, gin.H{
-			"message": "User deleted successfully",
-			"userID":  userID,
-		})
 	}
 }
