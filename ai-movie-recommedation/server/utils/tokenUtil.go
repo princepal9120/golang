@@ -23,9 +23,9 @@ type SignedDetails struct {
 }
 
 var SECRET_KEY string = os.Getenv("SECRET_KEY")
-var SECRET_REF_KEY string = os.Getenv("SECRET_REF_KEY")
+var SECRET_REFRESH_KEY string = os.Getenv("SECRET_REFRESH_KEY")
 
-func GenerateAllTolkens(email, firstName, lastName, role, userId string) (string, string, error) {
+func GenerateAllTokens(email, firstName, lastName, role, userId string) (string, string, error) {
 	claims := &SignedDetails{
 		Email:     email,
 		FirstName: firstName,
@@ -33,67 +33,83 @@ func GenerateAllTolkens(email, firstName, lastName, role, userId string) (string
 		Role:      role,
 		UserId:    userId,
 		RegisteredClaims: jwt.RegisteredClaims{
-			Issuer:    "PopcornAI",
+			Issuer:    "MagicStream",
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
 		},
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	signedToken, err := token.SignedString([]byte(SECRET_KEY))
+
 	if err != nil {
 		return "", "", err
 	}
-	refershclaims := &SignedDetails{
+
+	refreshClaims := &SignedDetails{
 		Email:     email,
 		FirstName: firstName,
 		LastName:  lastName,
 		Role:      role,
 		UserId:    userId,
 		RegisteredClaims: jwt.RegisteredClaims{
-			Issuer:    "PopcornAI",
+			Issuer:    "MagicStream",
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(168 * time.Hour)), // 7 days
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * 7 * time.Hour)),
 		},
 	}
-	refershtoken := jwt.NewWithClaims(jwt.SigningMethodHS256, refershclaims)
-	signedRefereshToken, err := refershtoken.SignedString([]byte(SECRET_REF_KEY))
+	refreshToken := jwt.NewWithClaims(jwt.SigningMethodHS256, refreshClaims)
+	signedRefreshToken, err := refreshToken.SignedString([]byte(SECRET_REFRESH_KEY))
+
 	if err != nil {
 		return "", "", err
 	}
-	return signedToken, signedRefereshToken, nil
+
+	return signedToken, signedRefreshToken, nil
+
 }
 
-func UpdateAllTokens(userId, token, refreshToken string) (err error) {
+func UpdateAllTokens(userId, token, refreshToken string, client *mongo.Client) (err error) {
 	var ctx, cancel = context.WithTimeout(context.Background(), 100*time.Second)
 	defer cancel()
+
 	updateAt, _ := time.Parse(time.RFC3339, time.Now().Format(time.RFC3339))
+
 	updateData := bson.M{
 		"$set": bson.M{
 			"token":         token,
 			"refresh_token": refreshToken,
-			"updated_at":    updateAt,
+			"update_at":     updateAt,
 		},
 	}
-	var userCollection *mongo.Collection = database.OpenCollection("users")
+
+	var userCollection *mongo.Collection = database.OpenCollection("users", client)
+
 	_, err = userCollection.UpdateOne(ctx, bson.M{"user_id": userId}, updateData)
+
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func GetAccesstoken(c *gin.Context) (string, error) {
-	authHeader := c.Request.Header.Get("Authorization")
-	if authHeader == "" {
-		return "", errors.New("Authorization header is required")
+func GetAccessToken(c *gin.Context) (string, error) {
+	// authHeader := c.Request.Header.Get("Authorization")
+	// if authHeader == "" {
+	// 	return "", errors.New("Authorization header is required")
+	// }
+	// tokenString := authHeader[len("Bearer "):]
 
-	}
-	tokenString := authHeader[len("Bearer "):]
-	if tokenString == "" {
-		return "", errors.New("Bearer token is required")
+	// if tokenString == "" {
+	// 	return "", errors.New("Bearer token is required")
+	// }
+	tokenString, err := c.Cookie("access_token")
+	if err != nil {
 
+		return "", err
 	}
+
 	return tokenString, nil
+
 }
 
 func ValidateToken(tokenString string) (*SignedDetails, error) {
@@ -156,7 +172,7 @@ func ValidateRefreshToken(tokenString string) (*SignedDetails, error) {
 	claims := &SignedDetails{}
 	token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
 
-		return []byte(SECRET_REF_KEY), nil
+		return []byte(SECRET_REFRESH_KEY), nil
 	})
 
 	if err != nil {
