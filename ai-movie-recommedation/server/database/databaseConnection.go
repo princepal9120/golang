@@ -37,7 +37,7 @@ func Connect() *mongo.Client {
 	return client
 }
 
-
+//var Client *mongo.Client = DBInstance()
 
 func OpenCollection(collectionName string, client *mongo.Client) *mongo.Collection {
 

@@ -16,6 +16,7 @@ func main() {
 	})
 
 	router.GET("/movies", controllers.GetMovies())
+	router.GET("/movie", controllers.GetMovie())
 
 	if err := router.Run(":8080"); err != nil {
 		fmt.Println("Fialed to start server", err)
