@@ -11,50 +11,37 @@ import (
 )
 
 func Connect() *mongo.Client {
-
 	err := godotenv.Load(".env")
-
 	if err != nil {
-		log.Println("Warning: unable to fund .env file")
+		log.Println("Warning : unable to  find dotenv file")
 	}
-
 	MongoDb := os.Getenv("MONGODB_URI")
-
 	if MongoDb == "" {
-		log.Fatal("MONGODB_URI not set!")
+		log.Fatal("Mongodb uri not set!")
+
 	}
-
-	fmt.Println("MongoDB URI: ", MongoDb)
-
 	clientOptions := options.Client().ApplyURI(MongoDb)
-
 	client, err := mongo.Connect(clientOptions)
-
 	if err != nil {
 		return nil
 	}
-
 	return client
 }
 
-//var Client *mongo.Client = DBInstance()
+var Client *mongo.Client = Connect()
 
-func OpenCollection(collectionName string, client *mongo.Client) *mongo.Collection {
-
+func OpenCollection(collectionName string) *mongo.Collection {
 	err := godotenv.Load(".env")
 	if err != nil {
-		log.Println("Warning: unable to find .env file")
+		log.Println("Warning : unable to find dotenv file")
 	}
-
 	databaseName := os.Getenv("DATABASE_NAME")
 
-	fmt.Println("DATABASE_NAME: ", databaseName)
+	fmt.Println("DATABASE_NAME", databaseName)
 
-	collection := client.Database(databaseName).Collection(collectionName)
-
+	collection := Client.Database(databaseName).Collection(collectionName)
 	if collection == nil {
 		return nil
 	}
 	return collection
-
 }

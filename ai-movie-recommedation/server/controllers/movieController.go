@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/go-playground/validator/v10"
 	"github.com/princepal9120/ai-movie-recommedation/server/database"
 	"github.com/princepal9120/ai-movie-recommedation/server/models"
 	"go.mongodb.org/mongo-driver/v2/bson"
@@ -13,6 +14,7 @@ import (
 )
 
 var movieCollection *mongo.Collection = database.OpenCollection("movies")
+var validate =validator.New()
 
 func GetMovies() gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -58,6 +60,25 @@ func AddMovie() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ctx,  cancel := context.WithTimeout(c, 100*time.Second)
 		defer cancel()
+
+		var movie models.Movie
+		if err := c.ShouldBindJSON(&movie); err !=nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid input"})
+			return
+		}
+		if err:= validate.Struct(movie); err!= nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "validation failed", "details": err.Error()})
+			return
+		}
+
+		result ,err:= movieCollection.InsertOne(ctx,movie)
+		if err!= nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to add movie"})
+			return
+		}
+
+		c.JSON(http.StatusOK,result)
+
 
 		 
 	}

@@ -1,3 +1,4 @@
+
 package main
 
 import (
@@ -16,9 +17,11 @@ func main() {
 	})
 
 	router.GET("/movies", controllers.GetMovies())
-	router.GET("/movie", controllers.GetMovie())
+	router.GET("/movie/:imdb_id", controllers.GetMovie())
+	router.POST("/addmovie", controllers.AddMovie())
+	router.POST("/register", controllers.RegisterUser())
 
-	if err := router.Run(":8080"); err != nil {
+	if err := router.Run(":8081"); err != nil {
 		fmt.Println("Fialed to start server", err)
 	}
 }
