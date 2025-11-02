@@ -3,14 +3,16 @@ module github.com/princepal9120/go-grpc-graphql-microservices
 go 1.25.2
 
 require (
-	github.com/99designs/gqlgen v0.10.2
+	github.com/99designs/gqlgen v0.17.81
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/vektah/gqlparser/v2 v2.5.30
 )
 
 require (
 	github.com/agnivade/levenshtein v1.2.1 // indirect
-	github.com/gorilla/websocket v1.2.0 // indirect
-	github.com/hashicorp/golang-lru v0.5.0 // indirect
-	github.com/vektah/gqlparser v1.2.1 // indirect
+	github.com/go-viper/mapstructure/v2 v2.4.0 // indirect
+	github.com/google/uuid v1.6.0 // indirect
+	github.com/gorilla/websocket v1.5.0 // indirect
+	github.com/hashicorp/golang-lru/v2 v2.0.7 // indirect
+	github.com/sosodev/duration v1.3.1 // indirect
 )
